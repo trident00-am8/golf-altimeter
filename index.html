@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<!-- PWA / iOS 홈 화면 설치 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="해발고도">
+<meta name="theme-color" content="#1B4332">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Golf Altimeter · 해발고도 측정기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #EFF6FF 0%, #F8FAFC 50%, #F0FDF4 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Noto Sans KR', sans-serif;
+  }
+  .wrap { width: 100%; max-width: 370px; }
+
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
+  .flag-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; color: #9CA3AF; text-transform: uppercase; }
+  .title { font-size: 22px; font-weight: 800; color: #14312A; letter-spacing: -0.4px; }
+  .live-row { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #22C55E; animation: lp 1.8s ease-in-out infinite; }
+  .live-txt { font-size: 11px; font-weight: 700; color: #22C55E; letter-spacing: 0.1em; }
+  .count-txt { font-size: 11px; color: #9CA3AF; margin-top: 2px; text-align: right; }
+
+  /* 오프라인 배너 */
+  .offline-bar {
+    display: none; align-items: center; gap: 8px;
+    background: #FEF3C7; border: 1px solid #FDE68A;
+    border-radius: 10px; padding: 8px 14px; margin-bottom: 12px;
+    font-size: 12px; color: #92400E; font-weight: 500;
+  }
+  .offline-bar.show { display: flex; }
+
+  /* 설치 힌트 */
+  .install-hint {
+    display: none; align-items: center; gap: 8px;
+    background: #EFF6FF; border: 1px solid #BFDBFE;
+    border-radius: 10px; padding: 9px 14px; margin-bottom: 12px;
+    font-size: 12px; color: #1E40AF; font-weight: 500; line-height: 1.4;
+  }
+  .install-hint.show { display: flex; }
+  .install-hint .close-x { margin-left: auto; font-size: 14px; color: #93C5FD; cursor: pointer; flex-shrink: 0; }
+  .install-btn {
+    display: none; width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, #1E40AF, #3B82F6); color: white;
+    font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px;
+    box-shadow: 0 4px 12px rgba(30,64,175,0.3);
+  }
+  .install-btn.show { display: block; }
+
+  .card {
+    background: white; border-radius: 22px; padding: 32px 26px 26px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05), 0 12px 40px rgba(20,49,42,0.07);
+    margin-bottom: 12px;
+  }
+  .alt-display { text-align: center; margin-bottom: 8px; }
+  .alt-inner { display: inline-flex; align-items: baseline; gap: 4px; }
+  .alt-neg { font-size: 44px; font-weight: 300; color: #6B7280; line-height: 1; }
+  .alt-num {
+    font-size: 88px; font-weight: 900; line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -3px;
+    transition: color 0.3s; color: #E5E7EB;
+  }
+  .alt-num.active { color: #14312A; animation: fadeIn 0.25s ease; }
+  .alt-unit { font-size: 17px; color: #6B7280; font-weight: 500; margin-top: 4px; text-align: center; }
+  .acc-wrap { text-align: center; margin-top: 14px; min-height: 30px; }
+  .acc-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 999px;
+  }
+  .requesting-txt { font-size: 13px; color: #9CA3AF; font-style: italic; }
+
+  .bonus-card {
+    background: linear-gradient(135deg, #1B4332, #2D6A4F);
+    border-radius: 14px; padding: 16px 18px; margin-top: 20px; color: white;
+  }
+  .bonus-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; opacity: 0.65; text-transform: uppercase; margin-bottom: 8px; }
+  .bonus-row { display: flex; align-items: center; justify-content: space-between; }
+  .bonus-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.7; text-transform: uppercase; }
+  .bonus-val-row { display: flex; align-items: baseline; gap: 3px; }
+  .bonus-big { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .bonus-pct { font-size: 18px; font-weight: 600; opacity: 0.8; }
+  .club-box { text-align: right; }
+  .club-label { font-size: 10px; opacity: 0.6; margin-bottom: 4px; letter-spacing: 0.08em; }
+  .club-val { font-size: 13px; font-weight: 700; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; min-width: 120px; }
+  .bonus-note { font-size: 12px; margin-top: 6px; opacity: 0.8; font-weight: 500; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .stat-box { background: #F9FAFB; border-radius: 12px; padding: 12px 14px; text-align: center; border: 1px solid #F3F4F6; }
+  .stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .stat-val { font-size: 24px; font-weight: 800; color: #1C1917; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+  .stat-unit { font-size: 11px; color: #9CA3AF; margin-left: 2px; }
+
+  .spark-wrap { margin-top: 18px; padding-top: 16px; border-top: 1px solid #F3F4F6; }
+  .spark-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .spark-label { font-size: 10px; font-weight: 700; color: #9CA3AF; letter-spacing: 0.12em; text-transform: uppercase; }
+  .spark-count { font-size: 10px; color: #D1D5DB; }
+
+  .msg { border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; display: flex; gap: 10px; align-items: flex-start; }
+  .msg-txt { font-size: 13px; line-height: 1.5; }
+  .msg.warn { background: #FFFBEB; } .msg.warn .msg-txt { color: #92400E; }
+  .msg.err  { background: #FEF2F2; } .msg.err  .msg-txt { color: #991B1B; }
+
+  .btn { width: 100%; padding: 17px; border-radius: 14px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; letter-spacing: -0.2px; transition: all 0.2s; }
+  .btn.start { background: linear-gradient(135deg, #1B4332, #2D6A4F); color: white; box-shadow: 0 4px 14px rgba(27,67,50,0.35); }
+  .btn.stop  { background: linear-gradient(135deg, #FEE2E2, #FECACA); color: #991B1B; }
+
+  .privacy { display: flex; align-items: flex-start; gap: 8px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 10px 14px; margin-top: 12px; }
+  .privacy-txt { font-size: 12px; color: #166534; line-height: 1.5; }
+  .privacy-txt strong { color: #15803D; }
+  .footer-txt { text-align: center; font-size: 11px; color: #D1D5DB; line-height: 1.6; margin-top: 8px; }
+
+  @keyframes lp       { 0%,100%{opacity:1;transform:scale(1)}  50%{opacity:.4;transform:scale(1.4)} }
+  @keyframes fadeIn   { 0%{opacity:.5} 100%{opacity:1} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 오프라인 배너 -->
+  <div class="offline-bar" id="offlineBar">
+    <span>📡</span><span>오프라인 상태 — 캐시된 앱으로 실행 중입니다</span>
+  </div>
+
+  <!-- Android: Chrome 자동 설치 버튼 -->
+  <button class="install-btn" id="installBtn" onclick="triggerInstall()">📲 홈 화면에 앱으로 설치</button>
+
+  <!-- iOS 수동 힌트 -->
+  <div class="install-hint" id="installHint">
+    <span>📲</span>
+    <span>홈 화면에 추가하면 앱처럼 사용할 수 있어요<br><b>Safari 하단 공유 버튼 → 홈 화면에 추가</b></span>
+    <span class="close-x" onclick="dismissHint()">✕</span>
+  </div>
+
+  <!-- 헤더 -->
+  <div class="header">
+    <div>
+      <div class="flag-row">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
+          <line x1="3" y1="1" x2="3" y2="19" stroke="#9CA3AF" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M3 2 L15 5.5 L3 9Z" fill="#2D6A4F"/>
+        </svg>
+        <span class="eyebrow">Golf Altimeter</span>
+      </div>
+      <div class="title">해발고도 측정기</div>
+    </div>
+    <div style="text-align:right">
+      <div class="live-row" id="liveRow" style="display:none">
+        <span class="live-dot"></span><span class="live-txt">LIVE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 카드 -->
+  <div class="card">
+    <div class="alt-display">
+      <div class="alt-inner">
+        <span class="alt-neg" id="negSign" style="display:none">−</span>
+        <span class="alt-num" id="altNum">—</span>
+      </div>
+      <div class="alt-unit">m &nbsp;해발</div>
+    </div>
+    <div class="acc-wrap" id="accWrap"></div>
+
+    <div class="bonus-card" id="bonusCard" style="display:none">
+      <div class="bonus-eyebrow">⛳ 비거리 보정</div>
+      <div class="bonus-row">
+        <div>
+          <div class="bonus-label">평지 대비 비거리</div>
+          <div class="bonus-val-row">
+            <span class="bonus-big" id="bonusVal">0</span>
+            <span class="bonus-pct">%</span>
+          </div>
+        </div>
+        <div class="club-box">
+          <div class="club-label">클럽 선택</div>
+          <div class="club-val" id="clubVal">평지와 동일</div>
+        </div>
+      </div>
+      <div class="bonus-note" id="bonusNote"></div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid" style="display:none">
+      <div class="stat-box">
+        <div class="stat-label" style="color:#3B82F6">↓ 최저</div>
+        <div class="stat-val"><span id="statMin">—</span><span class="stat-unit">m</span></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label" style="color:#F59E0B">↑ 최고</div>
+        <div class="stat-val"><span id="statMax">—</span><span class="stat-unit">m</span></div>
+      </div>
+    </div>
+
+    <div class="spark-wrap" id="sparkWrap" style="display:none">
+      <div class="spark-header">
+        <span class="spark-label">고도 추이</span>
+      </div>
+      <div style="display:flex;justify-content:center">
+        <svg id="sparkSvg" width="300" height="48" style="overflow:visible;display:block">
+          <defs>
+            <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2D6A4F" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="#2D6A4F" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div id="msgBox" style="display:none"></div>
+
+  <button class="btn start" id="mainBtn" onclick="handleBtn()">▶ 측정 시작</button>
+
+  <div class="privacy">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px">
+      <path d="M8 1L2 3.5V7.5C2 11 5 14 8 15C11 14 14 11 14 7.5V3.5L8 1Z" fill="#BBF7D0" stroke="#22C55E" stroke-width="1.2"/>
+      <path d="M5.5 8L7 9.5L10.5 6" stroke="#166634" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="privacy-txt">
+      <strong>개인정보 보호 보증 —</strong> 측정된 위치 데이터는 이 기기 안에서만 사용되며, 외부 서버로 전송되지 않습니다.
+    </span>
+  </div>
+  <p class="footer-txt">GPS 기반 · 실내 또는 위성 신호가 약한 환경에서는 정확도가 낮을 수 있습니다</p>
+</div>
+
+<script>
+// ── PWA: 서비스 워커 등록 ──────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  });
+}
+
+// ── 오프라인 감지 ──────────────────────────────────────────
+function updateOnline() {
+  var bar = document.getElementById('offlineBar');
+  if (!navigator.onLine) bar.classList.add('show');
+  else bar.classList.remove('show');
+}
+window.addEventListener('online',  updateOnline);
+window.addEventListener('offline', updateOnline);
+updateOnline();
+
+// ── 설치 프롬프트 (Android Chrome) ─────────────────────────
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBtn').classList.add('show');
+});
+window.addEventListener('appinstalled', function() {
+  document.getElementById('installBtn').classList.remove('show');
+  deferredPrompt = null;
+});
+function triggerInstall() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function() {
+    deferredPrompt = null;
+    document.getElementById('installBtn').classList.remove('show');
+  });
+}
+
+// ── 홈 화면 설치 힌트 (iOS Safari 전용) ────────────────────
+var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+var isStandalone = window.navigator.standalone === true;
+var hintDismissed = localStorage.getItem('hintDismissed');
+if (isIOS && !isStandalone && !hintDismissed) {
+  document.getElementById('installHint').classList.add('show');
+}
+function dismissHint() {
+  document.getElementById('installHint').classList.remove('show');
+  localStorage.setItem('hintDismissed', '1');
+}
+
+// ── 앱 로직 ───────────────────────────────────────────────
+var watchId = null, history = [], stats = { min: null, max: null }, count = 0, phase = 'idle';
+
+function distBonus(m) { return m > 0 ? Math.round(m * 0.625) / 100 : 0; }
+function clubNote(p) {
+  if (p < 0.5) return '평지와 동일';
+  if (p < 2.0) return '반 클럽 짧게 선택';
+  if (p < 4.5) return '한 클럽 짧게 선택';
+  if (p < 7.0) return '한~두 클럽 짧게 선택';
+  return '두 클럽 짧게 선택';
+}
+
+function handleBtn() {
+  (phase === 'active' || phase === 'requesting') ? stop() : start();
+}
+
+function start() {
+  if (!navigator.geolocation) { showPhase('unsupported'); return; }
+  showPhase('requesting');
+  history = []; stats = { min:null, max:null }; count = 0;
+  updateStats(); updateSpark();
+
+  function doFetch() {
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        var alt = pos.coords.altitude, acc = pos.coords.altitudeAccuracy;
+        if (alt == null) { showPhase('no-alt'); return; }
+        var m = Math.round(alt); count++;
+        history.push({ alt: m }); if (history.length > 40) history.shift();
+        if (stats.min == null || m < stats.min) stats.min = m;
+        if (stats.max == null || m > stats.max) stats.max = m;
+        updateAlt(m, acc != null ? Math.round(acc) : null);
+        updateStats(); updateSpark();
+        showPhase('active');
+      },
+      function(err) {
+        if (phase !== 'active') {
+          showPhase('error', err.code === 1 ? '위치 권한이 거부되었습니다.\n브라우저 설정에서 허용해 주세요.' : 'GPS 신호를 확인해 주세요.');
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+  }
+  doFetch();
+  watchId = setInterval(doFetch, 3000);
+}
+
+function stop() {
+  if (watchId != null) { clearInterval(watchId); watchId = null; }
+  showPhase('stopped');
+}
+
+function updateAlt(m, acc) {
+  var el = document.getElementById('altNum');
+  el.textContent = Math.abs(m).toLocaleString('ko-KR');
+  el.className = 'alt-num active';
+  document.getElementById('negSign').style.display = m < 0 ? 'inline' : 'none';
+
+  var wrap = document.getElementById('accWrap');
+  if (acc != null) {
+    var c = acc<=6  ? ['#F0FDF4','#15803D','#22C55E','매우 높음']
+           :acc<=18 ? ['#F0FDF4','#166534','#86EFAC','양호']
+           :acc<=35 ? ['#FFFBEB','#854D0E','#FCD34D','보통']
+           :          ['#FEF2F2','#991B1B','#FCA5A5','낮음'];
+    wrap.innerHTML = '<span class="acc-badge" style="background:'+c[0]+';color:'+c[1]+';border:1px solid '+c[2]+'40">'
+      +'<svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" stroke="'+c[2]+'" stroke-width="1.5" fill="none"/><circle cx="5" cy="5" r="1.8" fill="'+c[2]+'"/></svg>'
+      +'정확도 ±'+acc+'m · '+c[3]+'</span>';
+  } else {
+    wrap.innerHTML = '';
+  }
+  var bonus = distBonus(m);
+  document.getElementById('bonusCard').style.display = 'block';
+  document.getElementById('bonusVal').textContent = bonus > 0 ? '+'+bonus.toFixed(1) : '0';
+  document.getElementById('clubVal').textContent = clubNote(bonus);
+  document.getElementById('bonusNote').textContent = bonus > 0 ? '100m 타격 시 약 '+bonus.toFixed(1)+'m 더 날아갑니다' : '';
+}
+
+function updateStats() {
+  var g = document.getElementById('statsGrid');
+  if (stats.min == null) { g.style.display='none'; return; }
+  g.style.display = 'grid';
+  document.getElementById('statMin').textContent = stats.min.toLocaleString('ko-KR');
+  document.getElementById('statMax').textContent = stats.max.toLocaleString('ko-KR');
+}
+
+function updateSpark() {
+  var wrap = document.getElementById('sparkWrap');
+  if (history.length < 3) { wrap.style.display='none'; return; }
+  wrap.style.display = 'block';
+  var W=300,H=48,pad=6, vals=history.map(function(d){return d.alt;}),
+      lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals), rng=hi-lo||1;
+  var pts = vals.map(function(v,i){
+    return [pad+(i/(vals.length-1))*(W-pad*2), pad+((hi-v)/rng)*(H-pad*2)];
+  });
+  var line='M '+pts.map(function(p){return p[0]+','+p[1];}).join(' L ');
+  var area=line+' L '+pts[pts.length-1][0]+','+H+' L '+pts[0][0]+','+H+' Z';
+  var lx=pts[pts.length-1][0], ly=pts[pts.length-1][1];
+  var svg=document.getElementById('sparkSvg');
+  while(svg.children.length>1) svg.removeChild(svg.lastChild);
+  function el(tag,attrs){ var e=document.createElementNS('http://www.w3.org/2000/svg',tag); for(var k in attrs) e.setAttribute(k,attrs[k]); svg.appendChild(e); }
+  el('path',{d:area,fill:'url(#sg)'});
+  el('path',{d:line,fill:'none',stroke:'#2D6A4F','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round'});
+  el('circle',{cx:lx,cy:ly,r:'4',fill:'#2D6A4F'});
+}
+
+function showPhase(p, errText) {
+  phase = p;
+  var btn=document.getElementById('mainBtn'), lr=document.getElementById('liveRow'),
+      mb=document.getElementById('msgBox'), aw=document.getElementById('accWrap');
+  lr.style.display='none'; mb.style.display='none';
+  btn.className='btn start'; btn.textContent='▶ 측정 시작';
+  if (p==='active')     { lr.style.display='flex'; btn.className='btn stop'; btn.textContent='⏹ 측정 중지'; }
+  else if(p==='requesting') { aw.innerHTML='<span class="requesting-txt">GPS 신호 수신 중…</span>'; btn.className='btn stop'; btn.textContent='⏹ 측정 중지'; }
+  else if(p==='stopped')    { btn.textContent='🔄 다시 측정'; }
+  else if(p==='no-alt')     { mb.style.display='flex'; mb.className='msg warn'; mb.innerHTML='<span>⚠️</span><span class="msg-txt">이 기기는 고도 데이터를 지원하지 않습니다. GPS 탑재 모바일 기기를 이용해 주세요.</span>'; }
+  else if(p==='error')      { mb.style.display='flex'; mb.className='msg err';  mb.innerHTML='<span>🔒</span><span class="msg-txt" style="white-space:pre-line">'+(errText||'')+'</span>'; }
+  else if(p==='unsupported'){ mb.style.display='flex'; mb.className='msg err';  mb.innerHTML='<span>🔒</span><span class="msg-txt">이 브라우저는 위치 서비스를 지원하지 않습니다.</span>'; }
+}
+</script>
+</body>
+</html>

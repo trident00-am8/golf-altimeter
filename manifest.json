@@ -1,0 +1,14 @@
+{
+  "name": "Golf Altimeter",
+  "short_name": "해발고도",
+  "description": "골프 코스 해발고도 측정기 · 비거리 보정",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F7F2",
+  "theme_color": "#1B4332",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
